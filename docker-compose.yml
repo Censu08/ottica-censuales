@@ -101,12 +101,14 @@ services:
     container_name: ottica_censuales_frontend
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      - /app/node_modules  # Exclude node_modules from mount
+      - /app/.next         # Exclude .next from mount
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
       - NODE_ENV=development
+      - WATCHPACK_POLLING=true  # Per il hot reload su Windows/Docker
     depends_on:
       - backend
     networks:

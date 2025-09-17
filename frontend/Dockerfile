@@ -2,18 +2,20 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (tutte, non solo production)
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install
 
-# Copy source code
-COPY . .
+# Copia solo i file di configurazione inizialmente
+COPY next.config.js ./
+COPY tsconfig.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
 
-# Build application
-RUN npm run build
+# Il resto del codice sarà montato via volume
 
 # Expose port
 EXPOSE 3000
 
-# Start application
-CMD ["npm", "start"]
+# Start in development mode con hot reload
+CMD ["npm", "run", "dev"]

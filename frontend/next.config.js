@@ -7,8 +7,15 @@ const nextConfig = {
     domains: ['localhost', '127.0.0.1'],
     formats: ['image/webp', 'image/avif'],
   },
-  experimental: {
-    optimizeCss: true,
+//  experimental: {
+//    optimizeCss: true,
+//  },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, 'src'),
+    }
+    return config
   },
 }
 
