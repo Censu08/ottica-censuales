@@ -9,7 +9,7 @@ export default function Hero() {
             La Tua Vista è la Nostra Missione
           </h1>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Scopri la nostra selezione di occhiali da vista e da sole delle migliori marche. 
+            Scopri la nostra selezione di occhiali da vista e da sole delle migliori marche.
             Qualità, stile e professionalità da oltre 30 anni.
           </p>
           <div className="space-x-4">

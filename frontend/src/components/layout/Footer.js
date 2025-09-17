@@ -41,7 +41,8 @@ export default function Footer() {
             <div className="space-y-2 text-gray-400">
               <p>📞 +39 02 1234567</p>
               <p>✉️ info@otticacensuales.it</p>
-              <p>🕒 Lun-Sab 9:00-19:00</p>
+              <p>🕒 Lun-Ven 9:00-20:00</p>
+              <p>🕒 Sab 9:00-13:00</p>
             </div>
           </div>
         </div>

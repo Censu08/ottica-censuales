@@ -1,5 +1,7 @@
+# backend/apps/products/models.py
 from django.db import models
 from apps.common.models import TimeStampedModel
+
 
 class Category(TimeStampedModel):
     """Categorie prodotti gerarchiche"""
@@ -10,14 +12,15 @@ class Category(TimeStampedModel):
     image = models.ImageField(upload_to='categories/', null=True, blank=True)
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
-    
+
     class Meta:
         db_table = 'categories'
         verbose_name_plural = 'Categories'
         ordering = ['sort_order', 'name']
-    
+
     def __str__(self):
         return self.name
+
 
 class Brand(TimeStampedModel):
     """Marchi prodotti"""
@@ -27,62 +30,76 @@ class Brand(TimeStampedModel):
     description = models.TextField(blank=True)
     website = models.URLField(blank=True)
     is_active = models.BooleanField(default=True)
-    
+
     class Meta:
         db_table = 'brands'
         ordering = ['name']
-    
+
     def __str__(self):
         return self.name
 
+
 class Product(TimeStampedModel):
     """Modello prodotto base - generalizzato per ottica"""
+    PRODUCT_TYPES = [
+        ('glasses', 'Occhiali da Vista'),
+        ('sunglasses', 'Occhiali da Sole'),
+        ('contact_lenses', 'Lenti a Contatto'),
+        ('accessories', 'Accessori'),
+    ]
+
     # Identificativi
     sku = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
-    description = models.TextField()
-    short_description = models.CharField(max_length=500, blank=True)
-    
-    # Relazioni
+    description = models.TextField(blank=True)
+    short_description = models.CharField(max_length=300, blank=True)
+
+    # Categorizzazione
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
-    
+    product_type = models.CharField(max_length=20, choices=PRODUCT_TYPES)
+
     # Prezzi
-    base_price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
-    # Attributi specifici ottica (JSON per flessibilità)
-    optical_attributes = models.JSONField(default=dict, blank=True)
-    # Esempi: {"lens_type": "progressive", "material": "titanium", "gender": "unisex"}
-    
+
     # Immagini
     main_image = models.ImageField(upload_to='products/', null=True, blank=True)
-    
-    # SEO
+
+    # SEO e metadata
     meta_title = models.CharField(max_length=200, blank=True)
-    meta_description = models.CharField(max_length=300, blank=True)
-    
+    meta_description = models.TextField(max_length=300, blank=True)
+
     # Status
     is_active = models.BooleanField(default=True)
-    is_prescription_required = models.BooleanField(default=False)
-    requires_measurement = models.BooleanField(default=False)
-    
-    # Dimensioni/peso per spedizioni
-    weight = models.DecimalField(max_digits=8, decimal_places=3, null=True, blank=True)
-    dimensions = models.JSONField(default=dict, blank=True)
-    
+    is_featured = models.BooleanField(default=False)
+
+    # Specifiche tecniche prodotto ottica (JSON per flessibilità)
+    specifications = models.JSONField(default=dict, blank=True)
+    # Esempio: {"frame_material": "acetato", "lens_type": "progressiva", "protection": "UV400"}
+
+    # Weight per spedizioni
+    weight = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
     class Meta:
         db_table = 'products'
-        ordering = ['name']
+        ordering = ['-created_at']
         indexes = [
             models.Index(fields=['sku']),
             models.Index(fields=['category', 'brand']),
             models.Index(fields=['is_active']),
         ]
-    
+
     def __str__(self):
         return f"{self.brand.name} - {self.name}"
+
+    @property
+    def current_price(self):
+        """Ritorna il prezzo attuale (sale_price se disponibile, altrimenti price)"""
+        return self.sale_price if self.sale_price else self.price
+
 
 class ProductImage(TimeStampedModel):
     """Immagini aggiuntive prodotto"""
@@ -90,33 +107,33 @@ class ProductImage(TimeStampedModel):
     image = models.ImageField(upload_to='products/')
     alt_text = models.CharField(max_length=200, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
-    
+
     class Meta:
         db_table = 'product_images'
         ordering = ['sort_order']
+
 
 class ProductVariant(TimeStampedModel):
     """Varianti prodotto (colori, taglie, gradazioni)"""
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
     sku = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=200)
-    
+
     # Attributi variante
     attributes = models.JSONField(default=dict)
     # Esempi: {"color": "black", "size": "M", "lens_power": "+2.50"}
-    
+
     # Prezzi specifici variante
     price_adjustment = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    
+
     # Immagine specifica variante
     image = models.ImageField(upload_to='variants/', null=True, blank=True)
-    
+
     # Status
     is_active = models.BooleanField(default=True)
-    
+
     class Meta:
         db_table = 'product_variants'
-        unique_together = ['product', 'attributes']
-    
+
     def __str__(self):
         return f"{self.product.name} - {self.name}"
