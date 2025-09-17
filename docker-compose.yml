@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # Database PostgreSQL
+  db:
+    image: postgres:15
+    container_name: ottica_censuales_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=ottica_censuales
+      - POSTGRES_USER=ottica_user
+      - POSTGRES_PASSWORD=ottica_password
+    ports:
+      - "5432:5432"
+    networks:
+      - ottica_network
+
+  # Redis per cache e Celery
+  redis:
+    image: redis:7-alpine
+    container_name: ottica_censuales_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ottica_network
+
+  # Backend Django
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ottica_censuales_backend
+    volumes:
+      - ./backend:/app
+      - media_volume:/app/media
+      - static_volume:/app/staticfiles
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://ottica_user:ottica_password@db:5432/ottica_censuales
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - SECRET_KEY=your-secret-key-change-in-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ottica_network
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # Celery Worker
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ottica_censuales_celery
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://ottica_user:ottica_password@db:5432/ottica_censuales
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ottica_network
+    command: celery -A ottica_censuales worker -l info
+
+  # Celery Beat (per task schedulati)
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ottica_censuales_celery_beat
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://ottica_user:ottica_password@db:5432/ottica_censuales
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ottica_network
+    command: celery -A ottica_censuales beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ottica_censuales_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    networks:
+      - ottica_network
+
+  # Nginx (per produzione e gestione static files)
+  nginx:
+    image: nginx:alpine
+    container_name: ottica_censuales_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/var/www/static
+      - media_volume:/var/www/media
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - ottica_network
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+
+networks:
+  ottica_network:
+    driver: bridge
